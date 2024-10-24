@@ -1,68 +1,75 @@
-import win32.win32evtlog as win32evtlog 
+import win32.win32evtlog as win32evtlog
 import time
 from datetime import datetime, timedelta
 import ollama
+import pymsgbox  
 
-jedanLog = ""
+# List of suspicious keywords and events
+SUSPICIOUS_KEYWORDS = ['malware', 'trojan', 'unauthorized', 'access denied', 'failed login', 'ransomware']
+SUSPICIOUS_EVENT_IDS = [4625, 4624, 4688, 4720, 1102]
 
+# Check if the given log is SUS
+def is_suspicious_event(event):
+
+    # Check event IDs
+    if event.EventID in SUSPICIOUS_EVENT_IDS:
+        return True
+    
+    # Check keywords
+    if event.StringInserts:
+        for keyword in SUSPICIOUS_KEYWORDS:
+            if any(keyword.lower() in str(item).lower() for item in event.StringInserts):
+                return True
+    
+    # Return False if there is no SUS IDs or Keywords
+    return False
+
+# Get logs
 def get_recent_windows_logs(log_type, minutes):
-    # Otvorite log
+    # Open log
     hand = win32evtlog.OpenEventLog(None, log_type)
-
-    # Prikupite logove
-    total_logs = win32evtlog.GetNumberOfEventLogRecords(hand)
-
+    # Read logs
     logs = win32evtlog.ReadEventLog(hand, win32evtlog.EVENTLOG_BACKWARDS_READ | win32evtlog.EVENTLOG_SEQUENTIAL_READ, 0)
-
-
+    # Cutoff time by given minutes
     cutoff_time = datetime.now() - timedelta(minutes=minutes)
-
-    print(f"Total log records in {log_type} log: {total_logs}")
-
+    
+    # Go through logs and check for SUS logs
     for event in logs:
         event_time = event.TimeGenerated
-        # Filtrirajte logove prema vremenu
-        if event_time >= cutoff_time:
-            jedanLog = (f"""
+        
+        # If there is SUS log, forward to ollama and display it 
+        if event_time >= cutoff_time and is_suspicious_event(event):
+            log = f"""
             Event ID: {event.EventID}
             Time Generated: {event.TimeGenerated}
             Source: {event.SourceName}
-            Category: {event.EventCategory}
             Description: {event.StringInserts}
-            {"-" * 40}
-            """)
-            response = chat_with_ollama(jedanLog)
-            print(f"""
+            """
+
+            response = chat_with_ollama(log)
+            
+            pymsgbox.alert(f"""
+                Sumnjiv događaj detektovan:
                 Event ID: {event.EventID}
                 Source: {event.SourceName}
                 Time Generated: {event.TimeGenerated}
-                Description: {event.StringInserts}
                 Ollama: {response}
-                """)
-
-    # Zatvorite log
+            """, "Upozorenje o sigurnosti")
+            
+    # Close log
     win32evtlog.CloseEventLog(hand)
 
-
-
+# Initialize chat with ollama 
 def chat_with_ollama(prompt):
     try:
-        # Pravilno korišćenje chat funkcije sa modelom "llama2"
+        # Create a chat with ollama with chosen model
         response = ollama.chat(model="deepseek-coder", messages=[{"role": "user", "content": prompt}])
-        
-        # Logujemo ceo odgovor za debugging
-        #print(f"Debug Response: {response}")
-        
-        # Pristupamo odgovoru unutar message["content"]
-        return response["message"]["content"] if "message" in response and "content" in response["message"] else "Nema odgovora od Ollame."
-    
+        return response["message"]["content"] if "message" in response and "content" in response["message"] else "No response from Ollama."
     except Exception as e:
-        return f"Greška prilikom komunikacije: {e}"
+        return f"Error: {e}"
 
+# Main
 if __name__ == '__main__':
-    # firstResponse = chat_with_ollama("I will be sending Windows Event Logs for you to analyze them and tell me if they are potentionally suspicious/risky/malicious or clean/safe, check for suspicious program names, logins... I am a program programmed to send you logs, I wont be able to send you any more information except logs.")
-    # print(f"Ollama: {firstResponse}")
     while True:
-        get_recent_windows_logs('Application', minutes=0.205)  # Možeš promeniti 'System' u 'Application' ili 'Security'
-        
-        time.sleep(12)  # Interval u sekundama
+        get_recent_windows_logs('Application', minutes=0.205)  
+        time.sleep(12)
