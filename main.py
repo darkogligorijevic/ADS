@@ -3,6 +3,10 @@ import time
 from datetime import datetime, timedelta
 import ollama
 import pymsgbox  
+import socket
+
+hostname = socket.gethostname()
+ip_address = socket.gethostbyname(hostname)
 
 # List of suspicious keywords and events
 SUSPICIOUS_KEYWORDS = ['malware', 'trojan', 'unauthorized', 'access denied', 'failed login', 'ransomware']
@@ -41,18 +45,49 @@ def get_recent_windows_logs(log_type, minutes):
         if event_time >= cutoff_time and is_suspicious_event(event):
             log = f"""
             Event ID: {event.EventID}
+            Event Category: {event.EventCategory}
+            Event Type: {event.EventType}
+            Computer Name: {event.ComputerName}
+            Hostname: {hostname}
+            IP Address: {ip_address}
+            Source Name: {event.SourceName}
+            Record Number: {event.RecordNumber}
+            Closing Record Number: {event.ClosingRecordNumber}
+            Reserved: {event.Reserved}
+            Reserved Flags: {event.ReservedFlags}
+            SID: {event.Sid}
+            Data: {event.Data}
+            String Inserts: {event.StringInserts}
             Time Generated: {event.TimeGenerated}
-            Source: {event.SourceName}
+            Time Written: {event.TimeWritten}
             Description: {event.StringInserts}
             """
+
+            print(type(event.Sid))
+
+            
 
             response = chat_with_ollama(log)
             
             pymsgbox.alert(f"""
                 Sumnjiv događaj detektovan:
                 Event ID: {event.EventID}
+                Event Category: {event.EventCategory}
+                Event Type: {event.EventType}
+                Computer Name: {event.ComputerName}
+                Hostname: {hostname}
+                IP Address: {ip_address}
                 Source: {event.SourceName}
+                Record Number: {event.RecordNumber}
+                Closing Record Number: {event.ClosingRecordNumber}
+                Reserved: {event.Reserved}
+                Reserved Flags: {event.ReservedFlags}
+                SID: {event.Sid}
+                Data: {event.Data}
+                String Inserts: {event.StringInserts}
                 Time Generated: {event.TimeGenerated}
+                Time Written: {event.TimeWritten}
+                Description: {event.StringInserts}
                 Ollama: {response}
             """, "Upozorenje o sigurnosti")
             
@@ -63,7 +98,7 @@ def get_recent_windows_logs(log_type, minutes):
 def chat_with_ollama(prompt):
     try:
         # Create a chat with ollama with chosen model
-        response = ollama.chat(model="deepseek-coder", messages=[{"role": "user", "content": prompt}])
+        response = ollama.chat(model="dolphin-mistral", messages=[{"role": "user", "content": prompt}])
         return response["message"]["content"] if "message" in response and "content" in response["message"] else "No response from Ollama."
     except Exception as e:
         return f"Error: {e}"
