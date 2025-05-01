@@ -89,7 +89,7 @@ def get_recent_windows_logs(log_type, minutes):
                 Time Written: {event.TimeWritten}
                 Description: {event.StringInserts}
                 Ollama: {response}
-            """, "Upozorenje o sigurnosti")
+            """, "WARNING!")
             
     # Close log
     win32evtlog.CloseEventLog(hand)
