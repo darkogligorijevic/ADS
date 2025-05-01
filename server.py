@@ -1,12 +1,12 @@
 import ollama
 import socket
 
-# Definisanje server hosta i porta
-HOST = '0.0.0.0'  # Slušaj na svim interfejsima
-PORT = 65432      # Port koji ćeš koristiti za server
-OLLAMA_SERVER_URL = "http://localhost:11434"  # Zameni sa tačnom IP adresom i portom vašeg Ollama servera
+# Define HOST and PORT
+HOST = '0.0.0.0'  
+PORT = 65432      
+OLLAMA_SERVER_URL = "http://localhost:11434"  # Ollama default server on PORT 11434
 
-# Postavljanje baznog URL-a pre nego što se funkcija koristi
+# Base URL
 ollama.api_url = OLLAMA_SERVER_URL
 
 def parsed_logs():
@@ -17,52 +17,50 @@ def raw_logs():
 
 def chat_with_ollama(prompt):
     try:
-        # Pravilno korišćenje chat funkcije sa modelom "dolphin-mistral"
+        # Using dolphin-mistral as an ollama model
         response = ollama.chat(model="dolphin-mistral",
                                messages=[{"role": "user", "content": prompt}])
         
-        # Pristupamo odgovoru unutar message["content"]
-        return response["message"]["content"] if "message" in response and "content" in response["message"] else "Nema odgovora od Ollame."
+        # Return message
+        return response["message"]["content"] if "message" in response and "content" in response["message"] else "No response from Ollama."
     
     except Exception as e:
-        return f"Greška prilikom komunikacije: {e}"
+        return f"Error: {e}"
 
 def handle_client(conn, addr):
-    print(f"[+] Konekcija sa {addr} je uspostavljena.")
+    print(f"[+] Connected with {addr}.")
 
     try:
         while True:
-            # Prima podatke od klijenta
-            data = conn.recv(1024)  # Čitanje do 1024 bajta odjednom
+            # Receiving message from client
+            data = conn.recv(1024) 
             
             if not data:
-                # Ako nema više podataka, klijent je zatvorio konekciju
-                print(f"[-] Klijent {addr} je prekinuo vezu.")
+                # Close if no more data
+                print(f"[-] Client {addr} has terminated the connection.")
                 break
 
-            # Obrada primljenih podataka
             message = data.decode("utf-8")
             responsee = chat_with_ollama(message)
             print(responsee)
 
-            # Slanje odgovora klijentu (opciono)
-            conn.sendall(b"Poruka primljena!")
+            # Send response to the client
+            conn.sendall(b"Message received!")
         
     except Exception as e:
-        print(f"[-] Greska: {e}")
+        print(f"[-] Error: {e}")
     finally:
         conn.close()
-        print(f"[-] Konekcija sa {addr} je zatvorena.")
+        print(f"[-] Connection with {addr} is closed.")
 
 def start_server():
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
         server_socket.bind((HOST, PORT))
         server_socket.listen()
 
-        print("[*] Server pokrenut i slusa za dolazece konekcije...")
+        print("[*] Listening...")
 
         while True:
-            # Prihvatanje dolazne konekcije
             conn, addr = server_socket.accept()
             handle_client(conn, addr)
 
